@@ -72,9 +72,9 @@ def build_packet():
 
 def is_unavailable(hostname):
     if hostname == "timeout.":
-        return 500
+        return 503
     if hostname == "hostname not returnable":
-        return 500
+        return 503
     return 200
 
 def get_route(hostname):
