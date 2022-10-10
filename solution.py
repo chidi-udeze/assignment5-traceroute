@@ -1,4 +1,5 @@
 from socket import *
+import socket
 import os
 import sys
 import struct
@@ -40,14 +41,28 @@ def checksum(string):
 
 def build_packet():
     #Fill in start
-    # In the sendOnePing() method of the ICMP Ping exercise ,firstly the header of our
-    # packet to be sent was made, secondly the checksum was appended to the header and
-    # then finally the complete packet was sent to the destination.
+        # In the sendOnePing() method of the ICMP Ping exercise ,firstly the header of our
+        # packet to be sent was made, secondly the checksum was appended to the header and
+        # then finally the complete packet was sent to the destination.
 
-    # Make the header in a similar way to the ping exercise.
-    # Append checksum to the header.
+        # Make the header in a similar way to the ping exercise.
+        # Append checksum to the header.
 
-    # Don’t send the packet yet , just return the final packet in this function.
+        # Don’t send the packet yet , just return the final packet in this function.
+    myChecksum = 0
+    ID = os.getpid() & 0xFFFF
+    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, 1)
+    data = struct.pack("d", time.time())
+    myChecksum = checksum(header + data)
+
+    # Get the right checksum, and put in the header
+    if sys.platform == "darwin":
+        # Convert 16-bit integers from host to network  byte order
+        myChecksum = htons(myChecksum) & 0xFFFF
+    else:
+        myChecksum = htons(myChecksum)
+    header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, 1)
+    
     #Fill in end
 
     # So the function ending should look like this
@@ -55,81 +70,118 @@ def build_packet():
     packet = header + data
     return packet
 
+def is_unavailable(hostname):
+    if hostname == "Request timed out.":
+        return 500
+    if hostname == "hostname not returnable":
+        return 500
+    return 200
+
 def get_route(hostname):
     timeLeft = TIMEOUT
-    df = pd.DataFrame(columns=['Hop Count', 'Try', 'IP', 'Hostname', 'Response Code'])
+    df = pd.DataFrame()
+    tracelist1 = []
+    tracelist2 = []
 
-    for ttl in range(1,MAX_HOPS):
+    for ttl in range(1, MAX_HOPS):
         for tries in range(TRIES):
             destAddr = gethostbyname(hostname)
-
-            #Fill in start
+            # Fill in start
             # Make a raw socket named mySocket
-            #Fill in end
+            icmp = socket.getprotobyname("icmp")
+            mySocket = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
+            # Fill in end
 
             mySocket.setsockopt(IPPROTO_IP, IP_TTL, struct.pack('I', ttl))
             mySocket.settimeout(TIMEOUT)
+
             try:
                 d = build_packet()
                 mySocket.sendto(d, (hostname, 0))
-                t= time.time()
+                t = time.time()
                 startedSelect = time.time()
                 whatReady = select.select([mySocket], [], [], timeLeft)
                 howLongInSelect = (time.time() - startedSelect)
                 if whatReady[0] == []: # Timeout
-                    #Fill in start
-                    #append response to your dataframe including hop #, try #, and "Timeout" responses as required by the acceptance criteria
-                    #print (df)
-                    #Fill in end
+                    tracelist1.append("* * * Request timed out.")
+                    tracelist2.append(tracelist1)
+                # Fill in start
+                # You should add the list above to your all traces list
+                # Fill in end
                 recvPacket, addr = mySocket.recvfrom(1024)
                 timeReceived = time.time()
                 timeLeft = timeLeft - howLongInSelect
                 if timeLeft <= 0:
                     tracelist1.append("* * * Request timed out.")
-                    #Fill in start
-                    #append response to your dataframe including hop #, try #, and "Timeout" responses as required by the acceptance criteria
-                    #print (df)
-                    #Fill in end
-            except Exception as e:
-                #print (e) # uncomment to view exceptions
+                    tracelist2.append(tracelist1)
+                    # Fill in start
+                    # You should add the list above to your all traces list
+                    # Fill in end
+            except:
                 continue
-
+        
             else:
-                #Fill in start
-                #Fetch the icmp type from the IP packet
-                #Fill in end
-                try: #try to fetch the hostname
-                    #Fill in start
-                    #Fill in end
-                except herror:   #if the host does not provide a hostname
-                    #Fill in start
-                    #Fill in end
-
-                if types == 11:
-                    bytes = struct.calcsize("d")
-                    timeSent = struct.unpack("d", recvPacket[28:28 +
-                    bytes])[0]
-                    #Fill in start
-                    #You should update your dataframe with the required column field responses here
-                    #Fill in end
-                elif types == 3:
+                # Fill in start
+                # Fetch the icmp type from the IP packet
+                icmpHeader = recvPacket[20:28]
+                request_type, code, checksum, packetID, sequence = struct.unpack("bbHHh", icmpHeader)
+                # Fill in end
+                try: # try to fetch the hostname
+                    # Fill in start
+                    hostaddr = gethostbyaddr(addr[0])[0]
+                    # Fill in end
+                except: # if the host does not provide a hostname
+                    # Fill in start
+                    hostaddr = "hostname not returnable"
+                    # Fill in end
+                if request_type == 11:
                     bytes = struct.calcsize("d")
                     timeSent = struct.unpack("d", recvPacket[28:28 + bytes])[0]
-                    #Fill in start
-                    #You should update your dataframe with the required column field responses here
-                    #Fill in end
-                elif types == 0:
+                    # Fill in start
+                    stringaddr = str(addr[0])
+                    stringttl = str(ttl)
+                    stringms = str((timeReceived - t) * 1000)
+                    tracelist2.append((stringttl, stringms, stringaddr, hostaddr))
+                    #tracelist2.append((ttl, (timeReceived - t) * 1000, addr[0], hostaddr))
+                    #print(ttl, " ", (timeReceived - t) * 1000, " ", addr[0], " ", hostaddr)
+                    # You should add your responses to your lists here
+                    # Fill in end
+                elif request_type == 3:
                     bytes = struct.calcsize("d")
                     timeSent = struct.unpack("d", recvPacket[28:28 + bytes])[0]
-                    #Fill in start
-                    #You should update your dataframe with the required column field responses here
-                    #Fill in end
+                    # Fill in start
+                    stringaddr = str(addr[0])
+                    stringttl = str(ttl)
+                    stringms = str((timeReceived - t) * 1000)
+                    tracelist2.append((stringttl, stringms, stringaddr, hostaddr))
+                    #tracelist2.append((ttl, (timeReceived - t) * 1000, addr[0], hostaddr))
+                    #print(ttl, " ", (timeReceived - t) * 1000, " ", addr[0], " ", hostaddr)
+                    # You should add your responses to your lists here
+                    # Fill in end
+                elif request_type == 0:
+                    bytes = struct.calcsize("d")
+                    timeSent = struct.unpack("d", recvPacket[28:28 + bytes])[0]
+                    # Fill in start
+                    stringaddr = str(addr[0])
+                    stringttl = str(ttl)
+                    stringms = str((timeReceived-t) * 1000)
+                    tracelist2.append((stringttl, stringms, stringaddr, hostaddr))
+                    #print(ttl, " ", (timeReceived - t) * 1000, " ", addr[0], " ", hostaddr)
+                    # You should add your responses to your lists here and return your list if your destination IP is met
+                    # Fill in end
                 else:
-                    #Fill in start
-                    #If there is an exception/error to your if statements, you should append that to your df here
-                    #Fill in end
+                    # Fill in start
+                    print("error")
+                    # If there is an exception/error to your if statements, you should append that to your list here
+                    # Fill in end
                 break
+            finally:
+                mySocket.close()
+    
+    df = pd.DataFrame(tracelist2, columns=['Hop Count', 'Try', 'IP', 'Hostname'])
+    df['Response Code'] = df['Hostname'].apply(is_unavailable)
     return df
 
 if __name__ == '__main__':
-    get_route("google.co.il")
+    tracelist = get_route("google.co.il")
+    
