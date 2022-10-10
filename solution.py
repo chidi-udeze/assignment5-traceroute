@@ -71,7 +71,7 @@ def build_packet():
     return packet
 
 def is_unavailable(hostname):
-    if hostname == "Request timed out.":
+    if hostname == "timeout.":
         return 500
     if hostname == "hostname not returnable":
         return 500
@@ -103,7 +103,7 @@ def get_route(hostname):
                 whatReady = select.select([mySocket], [], [], timeLeft)
                 howLongInSelect = (time.time() - startedSelect)
                 if whatReady[0] == []: # Timeout
-                    tracelist1.append("* * * Request timed out.")
+                    tracelist1.append("* * * timeout.")
                     tracelist2.append(tracelist1)
                 # Fill in start
                 # You should add the list above to your all traces list
@@ -112,7 +112,7 @@ def get_route(hostname):
                 timeReceived = time.time()
                 timeLeft = timeLeft - howLongInSelect
                 if timeLeft <= 0:
-                    tracelist1.append("* * * Request timed out.")
+                    tracelist1.append("* * * timeout.")
                     tracelist2.append(tracelist1)
                     # Fill in start
                     # You should add the list above to your all traces list
